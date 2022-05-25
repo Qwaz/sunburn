@@ -7,6 +7,7 @@ use solana_sdk::{
     bpf_loader,
     hash::Hash,
     instruction::Instruction,
+    loader_instruction,
     message::Message,
     program_pack::Pack,
     pubkey::Pubkey,
@@ -16,6 +17,7 @@ use solana_sdk::{
     system_instruction, system_program,
     transaction::Transaction,
 };
+use spl_associated_token_account::get_associated_token_address;
 
 pub mod client;
 
@@ -231,6 +233,7 @@ impl<C: ClientSync> Environment<C> {
         Ok(())
     }
 
+    /// Creates a new token mint using the provided keypair.
     pub fn create_token_mint(
         &mut self,
         mint: &Keypair,
@@ -258,6 +261,98 @@ impl<C: ClientSync> Environment<C> {
             ],
             &[mint],
         )?;
+        Ok(())
+    }
+
+    /// Mints tokens to `recipient` token account with the token authority keypair.
+    pub fn mint_tokens_to(
+        &mut self,
+        mint: Pubkey,
+        authority: &Keypair,
+        recipient: Pubkey,
+        amount: u64,
+    ) -> Result<(), ClientErrorSync<C>> {
+        self.run_instruction(
+            spl_token::instruction::mint_to(
+                &spl_token::ID,
+                &mint,
+                &recipient,
+                &authority.pubkey(),
+                &[],
+                amount,
+            )
+            .unwrap(),
+            &[authority],
+        )?;
+        Ok(())
+    }
+
+    /// Creates a token account using the associated token account scheme.
+    pub fn create_associated_token_account(
+        &mut self,
+        owner: Pubkey,
+        mint: Pubkey,
+    ) -> Result<Pubkey, ClientErrorSync<C>> {
+        // We need this deprecated version of API for our target version of Solana
+        self.run_instruction(
+            #[allow(deprecated)]
+            spl_associated_token_account::create_associated_token_account(
+                &self.payer.pubkey(),
+                &owner,
+                &mint,
+            ),
+            &[],
+        )?;
+        Ok(get_associated_token_address(&owner, &mint))
+    }
+
+    /// Creates an account with a data field.
+    /// The account is required to be empty and will be owned by bpf_loader afterwards.
+    pub fn create_account_with_data(
+        &mut self,
+        account: &Keypair,
+        data: &[u8],
+    ) -> Result<(), ClientErrorSync<C>> {
+        self.run_instruction(
+            system_instruction::create_account(
+                &self.payer.pubkey(),
+                &account.pubkey(),
+                self.rent.minimum_balance(data.len()),
+                data.len() as u64,
+                &bpf_loader::id(),
+            ),
+            &[account],
+        )?;
+
+        let mut offset = 0usize;
+        for chunk in data.chunks(900) {
+            self.run_instruction(
+                loader_instruction::write(
+                    &account.pubkey(),
+                    &bpf_loader::id(),
+                    offset as u32,
+                    chunk.to_vec(),
+                ),
+                &[account],
+            )?;
+            offset += chunk.len();
+        }
+
+        Ok(())
+    }
+
+    /// Create an executable account using a given keypair.
+    pub fn deploy_program(
+        &mut self,
+        account: &Keypair,
+        data: &[u8],
+    ) -> Result<(), ClientErrorSync<C>> {
+        self.create_account_with_data(account, data)?;
+        self.run_instruction(
+            loader_instruction::finalize(&account.pubkey(), &bpf_loader::id()),
+            &[account],
+        )?;
+
         Ok(())
     }
 }

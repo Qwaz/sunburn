@@ -15,5 +15,6 @@ solana-program-test = "1.9.22"
 solana-runtime = "1.9.22"
 solana-sdk = "1.9.22"
 spl-token = "3.2.0"
+spl-associated-token-account = "1.0.3"
 
 thiserror = "1.0.31"
