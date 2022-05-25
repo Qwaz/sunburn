@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use client::{ClientSync, LocalClientSync};
+use client::{ClientError, ClientSync, LocalClientSync};
 use solana_program_test::programs::spl_programs;
 use solana_sdk::{
-    account::{Account, AccountSharedData},
+    account::{Account, AccountSharedData, ReadableAccount},
     bpf_loader,
     hash::Hash,
     instruction::Instruction,
@@ -217,7 +217,10 @@ impl<C: ClientSync> Environment<C> {
         instructions: &[Instruction],
         signers: &[&Keypair],
     ) -> Result<(), ClientErrorSync<C>> {
-        let blockhash = self.client.latest_blockhash()?;
+        let blockhash = self
+            .client
+            .latest_blockhash()
+            .map_err(ClientError::ChannelError)?;
         let transaction = instructions_to_tx(&self.payer, blockhash, instructions, signers);
         self.client.send_transaction(transaction)?;
         Ok(())
@@ -231,6 +234,19 @@ impl<C: ClientSync> Environment<C> {
     ) -> Result<(), ClientErrorSync<C>> {
         self.run_instructions(&[instruction], signers)?;
         Ok(())
+    }
+
+    /// Gets account information at the given address.
+    pub fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientErrorSync<C>> {
+        self.client.get_account(address)
+    }
+
+    /// Gets how much token does this token account hold.
+    pub fn token_balance(&mut self, token_account: Pubkey) -> Result<u64, ClientErrorSync<C>> {
+        let account = self.client.get_account(token_account)?;
+        Ok(spl_token::state::Account::unpack_unchecked(&account.data())
+            .map_err(|_| ClientError::InvalidAccountData)?
+            .amount)
     }
 
     /// Creates a new token mint using the provided keypair.

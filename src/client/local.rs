@@ -99,7 +99,7 @@ impl ClientSync for LocalClientSync {
             .prepare_entry_batch(txs)
             .map_err(ClientError::InvalidTransaction)?;
 
-        let (tx_result, _) = self.bank.load_execute_and_commit_transactions(
+        let (mut tx_result, _) = self.bank.load_execute_and_commit_transactions(
             &batch,
             MAX_PROCESSING_AGE,
             false,
@@ -108,17 +108,17 @@ impl ClientSync for LocalClientSync {
             &mut Default::default(),
         );
 
-        convert_tx_result(tx_result.execution_results[0])
+        convert_tx_result(tx_result.execution_results.pop().unwrap())
     }
 
     fn latest_blockhash(&mut self) -> Result<Hash, Self::ChannelError> {
         Ok(self.bank.last_blockhash())
     }
 
-    fn get_account(&mut self, address: Pubkey) -> Result<Option<Account>, Self::ChannelError> {
-        Ok(self
-            .bank
+    fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>> {
+        self.bank
             .get_account(&address)
-            .map(|account| account.into()))
+            .map(|account| account.into())
+            .ok_or(ClientError::AccountNotFound(address))
     }
 }
