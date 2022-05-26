@@ -132,6 +132,7 @@ impl EnvironmentGenesis {
 
     /// Builds a [LocalClientSync] from the current configuration.
     pub fn build_local_sync(self) -> Environment<LocalClientSync> {
+        solana_logger::setup_with_default("");
         LocalClientSync::new(self)
     }
 }
@@ -189,7 +190,7 @@ impl Default for EnvironmentGenesis {
 
 pub struct Environment<C> {
     client: C,
-    address_labels: HashMap<Pubkey, String>,
+    _address_labels: HashMap<Pubkey, String>,
     payer: Keypair,
     /// Cached [Rent] information
     rent: Rent,
@@ -209,6 +210,20 @@ fn instructions_to_tx(
 }
 
 type ClientErrorSync<C> = client::ClientError<<C as ClientSync>::ChannelError>;
+
+impl<C> Environment<C> {
+    pub fn payer(&self) -> &Keypair {
+        &self.payer
+    }
+
+    pub fn rent(&self) -> Rent {
+        self.rent
+    }
+
+    pub fn rent_exemption_amount(&self, data_len: usize) -> u64 {
+        self.rent.minimum_balance(data_len).max(1)
+    }
+}
 
 impl<C: ClientSync> Environment<C> {
     /// Executes provided instructions as a transaction and returns the result.
@@ -281,7 +296,7 @@ impl<C: ClientSync> Environment<C> {
     }
 
     /// Mints tokens to `recipient` token account with the token authority keypair.
-    pub fn mint_tokens_to(
+    pub fn mint_tokens(
         &mut self,
         mint: Pubkey,
         authority: &Keypair,

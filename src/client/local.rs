@@ -1,4 +1,7 @@
-use solana_runtime::bank::{Bank, TransactionExecutionResult};
+use solana_runtime::{
+    bank::{Bank, TransactionExecutionResult},
+    builtins::Builtins,
+};
 use solana_sdk::{
     account::Account,
     clock::MAX_PROCESSING_AGE,
@@ -49,12 +52,23 @@ impl LocalClientSync {
 
         let genesis_config = GenesisConfig::new(&accounts, &[]);
 
-        let bank = Bank::new_for_tests(&genesis_config);
+        let mut bank = Bank::new_for_tests(&genesis_config);
+
+        // Add loaders
+        macro_rules! add_builtin {
+            ($b:expr) => {
+                bank.add_builtin(&$b.0, &$b.1, $b.2)
+            };
+        }
+        add_builtin!(solana_bpf_loader_program::solana_bpf_loader_deprecated_program!());
+        add_builtin!(solana_bpf_loader_program::solana_bpf_loader_program!());
+        add_builtin!(solana_bpf_loader_program::solana_bpf_loader_upgradeable_program!());
+
         let client = LocalClientSync { bank };
 
         Environment {
             client,
-            address_labels: genesis.address_labels,
+            _address_labels: genesis.address_labels,
             payer,
             rent,
         }

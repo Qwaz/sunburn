@@ -31,7 +31,7 @@ pub enum ClientError<E: std::error::Error> {
     ChannelError(#[source] E),
     /// An error that represents an invalid transaction
     /// that is invalid and not executed.
-    #[error("invalid transaction: {:?}", 0)]
+    #[error("invalid transaction: {}", 0)]
     InvalidTransaction(#[source] TransactionError),
     #[error("transaction failed to execute: {:?}", error)]
     /// An error that represents a transaction
