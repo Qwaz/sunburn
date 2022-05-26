@@ -1,7 +1,6 @@
 mod local;
 // TODO: mod remote;
 
-use solana_banks_interface::TransactionSimulationDetails;
 use solana_sdk::{
     account::{from_account, Account},
     hash::Hash,
@@ -13,6 +12,16 @@ use thiserror::Error;
 
 pub use self::local::LocalClientSync;
 
+/// This is spiritually `solana_banks_interface::TransactionSimulationDetails`,
+/// but the original type was not used because `solana_banks_interface`
+/// does not have a good interoperability among different Solana versions
+/// and makes dependency resolution difficult.
+#[derive(Clone, Debug)]
+pub struct TransactionDetails {
+    pub log_messages: Vec<String>,
+    pub units_consumed: u64,
+}
+
 // #[from] is deliberately avoided to prevent ambiguity.
 // `TransactionSimulationDetails` is chosen as an intersection type of
 // possible execution results.
@@ -20,12 +29,16 @@ pub use self::local::LocalClientSync;
 pub enum ClientError<E: std::error::Error> {
     #[error("channel error: {0}")]
     ChannelError(#[source] E),
+    /// An error that represents an invalid transaction
+    /// that is invalid and not executed.
     #[error("invalid transaction: {:?}", 0)]
     InvalidTransaction(#[source] TransactionError),
     #[error("transaction failed to execute: {:?}", error)]
+    /// An error that represents a transaction
+    /// that was executed and failed.
     FailedTransaction {
         error: TransactionError,
-        details: TransactionSimulationDetails,
+        details: TransactionDetails,
     },
     #[error("account not found: {}", 0)]
     AccountNotFound(Pubkey),
@@ -39,7 +52,7 @@ pub trait ClientSync {
     fn send_transaction(
         &mut self,
         transaction: Transaction,
-    ) -> Result<TransactionSimulationDetails, ClientError<Self::ChannelError>>;
+    ) -> Result<TransactionDetails, ClientError<Self::ChannelError>>;
 
     fn latest_blockhash(&mut self) -> Result<Hash, Self::ChannelError>;
 

@@ -1,4 +1,3 @@
-use solana_banks_interface::TransactionSimulationDetails;
 use solana_runtime::bank::{Bank, TransactionExecutionResult};
 use solana_sdk::{
     account::Account,
@@ -14,7 +13,7 @@ use solana_sdk::{
     transaction::{Transaction, VersionedTransaction},
 };
 
-use super::{ClientError, ClientSync};
+use super::{ClientError, ClientSync, TransactionDetails};
 use crate::{Environment, EnvironmentGenesis};
 
 pub struct LocalClientSync {
@@ -64,11 +63,11 @@ impl LocalClientSync {
 
 fn convert_tx_result<E: std::error::Error>(
     tx_result: TransactionExecutionResult,
-) -> Result<TransactionSimulationDetails, ClientError<E>> {
+) -> Result<TransactionDetails, ClientError<E>> {
     match tx_result {
         TransactionExecutionResult::Executed { details, .. } => {
-            let details_core = TransactionSimulationDetails {
-                logs: details.log_messages.unwrap_or(Vec::new()),
+            let details_core = TransactionDetails {
+                log_messages: details.log_messages.unwrap_or(Vec::new()),
                 units_consumed: details.executed_units,
             };
             match details.status {
@@ -92,7 +91,7 @@ impl ClientSync for LocalClientSync {
     fn send_transaction(
         &mut self,
         transaction: Transaction,
-    ) -> Result<TransactionSimulationDetails, ClientError<Self::ChannelError>> {
+    ) -> Result<TransactionDetails, ClientError<Self::ChannelError>> {
         let txs = vec![VersionedTransaction::from(transaction)];
         let batch = self
             .bank
