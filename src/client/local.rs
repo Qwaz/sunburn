@@ -1,7 +1,4 @@
-use solana_runtime::{
-    bank::{Bank, TransactionExecutionResult},
-    builtins::Builtins,
-};
+use solana_runtime::bank::{Bank, TransactionExecutionResult};
 use solana_sdk::{
     account::Account,
     clock::MAX_PROCESSING_AGE,
