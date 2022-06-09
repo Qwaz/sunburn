@@ -5,6 +5,7 @@ use solana_program_test::programs::spl_programs;
 use solana_sdk::{
     account::{Account, AccountSharedData, ReadableAccount},
     bpf_loader,
+    bpf_loader_upgradeable::{self, UpgradeableLoaderState},
     hash::Hash,
     instruction::Instruction,
     loader_instruction,
@@ -375,15 +376,77 @@ impl<C: ClientSync> Environment<C> {
     /// Create an executable account using a given keypair.
     pub fn deploy_program(
         &mut self,
-        account: &Keypair,
+        program_account: &Keypair,
         data: &[u8],
     ) -> Result<(), ClientErrorSync<C>> {
-        self.create_account_with_data(account, data)?;
+        self.create_account_with_data(program_account, data)?;
         self.run_instruction(
-            loader_instruction::finalize(&account.pubkey(), &bpf_loader::id()),
-            &[account],
+            loader_instruction::finalize(&program_account.pubkey(), &bpf_loader::id()),
+            &[program_account],
         )?;
 
         Ok(())
+    }
+
+    /// Deploys an upgradeable program and returns its ProgramData address
+    pub fn deploy_upgradeable_program(
+        &mut self,
+        program_account: &Keypair,
+        buffer_account: &Keypair,
+        authority_account: &Keypair,
+        data: &[u8],
+        compact: bool,
+    ) -> Result<Pubkey, ClientErrorSync<C>> {
+        let (programdata_address, _) = Pubkey::find_program_address(
+            &[&program_account.pubkey().to_bytes()],
+            &bpf_loader_upgradeable::ID,
+        );
+
+        let program_max_size = if compact { data.len() } else { data.len() * 2 };
+
+        let buffer_balance = self
+            .rent
+            .minimum_balance(UpgradeableLoaderState::programdata_len(program_max_size).unwrap());
+        self.run_instructions(
+            &bpf_loader_upgradeable::create_buffer(
+                &self.payer.pubkey(),
+                &buffer_account.pubkey(),
+                &authority_account.pubkey(),
+                buffer_balance,
+                program_max_size,
+            )
+            .unwrap(),
+            &[buffer_account],
+        )?;
+
+        let mut offset = 0usize;
+        for chunk in data.chunks(900) {
+            self.run_instruction(
+                bpf_loader_upgradeable::write(
+                    &buffer_account.pubkey(),
+                    &authority_account.pubkey(),
+                    offset as u32,
+                    chunk.to_vec(),
+                ),
+                &[authority_account],
+            )?;
+            offset += chunk.len();
+        }
+
+        self.run_instructions(
+            &bpf_loader_upgradeable::deploy_with_max_program_len(
+                &self.payer.pubkey(),
+                &program_account.pubkey(),
+                &buffer_account.pubkey(),
+                &authority_account.pubkey(),
+                self.rent
+                    .minimum_balance(UpgradeableLoaderState::program_len().unwrap()),
+                program_max_size,
+            )
+            .unwrap(),
+            &[program_account, authority_account],
+        )?;
+
+        Ok(programdata_address)
     }
 }
