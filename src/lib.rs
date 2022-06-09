@@ -252,6 +252,33 @@ impl<C: ClientSync> Environment<C> {
         Ok(())
     }
 
+    /// Executes provided instructions as a transaction and returns the result with the provided payer keypair.
+    pub fn run_instructions_with_payer(
+        &mut self,
+        instructions: &[Instruction],
+        payer: &Keypair,
+        signers: &[&Keypair],
+    ) -> Result<(), ClientErrorSync<C>> {
+        let blockhash = self
+            .client
+            .latest_blockhash()
+            .map_err(ClientError::ChannelError)?;
+        let transaction = instructions_to_tx(payer, blockhash, instructions, signers);
+        self.client.send_transaction(transaction)?;
+        Ok(())
+    }
+
+    /// Runs a single instruction as a transaction and returns the result with the provided payer keypair.
+    pub fn run_instruction_with_payer(
+        &mut self,
+        instruction: Instruction,
+        payer: &Keypair,
+        signers: &[&Keypair],
+    ) -> Result<(), ClientErrorSync<C>> {
+        self.run_instructions_with_payer(&[instruction], payer, signers)?;
+        Ok(())
+    }
+
     /// Gets account information at the given address.
     pub fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientErrorSync<C>> {
         self.client.get_account(address)
