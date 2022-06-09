@@ -213,6 +213,10 @@ fn instructions_to_tx(
 type ClientErrorSync<C> = client::ClientError<<C as ClientSync>::ChannelError>;
 
 impl<C> Environment<C> {
+    pub fn client(&mut self) -> &mut C {
+        &mut self.client
+    }
+
     pub fn payer(&self) -> &Keypair {
         &self.payer
     }
@@ -233,10 +237,7 @@ impl<C: ClientSync> Environment<C> {
         instructions: &[Instruction],
         signers: &[&Keypair],
     ) -> Result<(), ClientErrorSync<C>> {
-        let blockhash = self
-            .client
-            .latest_blockhash()
-            .map_err(ClientError::ChannelError)?;
+        let blockhash = self.client.latest_blockhash()?;
         let transaction = instructions_to_tx(&self.payer, blockhash, instructions, signers);
         self.client.send_transaction(transaction)?;
         Ok(())
@@ -259,10 +260,7 @@ impl<C: ClientSync> Environment<C> {
         payer: &Keypair,
         signers: &[&Keypair],
     ) -> Result<(), ClientErrorSync<C>> {
-        let blockhash = self
-            .client
-            .latest_blockhash()
-            .map_err(ClientError::ChannelError)?;
+        let blockhash = self.client.latest_blockhash()?;
         let transaction = instructions_to_tx(payer, blockhash, instructions, signers);
         self.client.send_transaction(transaction)?;
         Ok(())
@@ -277,6 +275,12 @@ impl<C: ClientSync> Environment<C> {
     ) -> Result<(), ClientErrorSync<C>> {
         self.run_instructions_with_payer(&[instruction], payer, signers)?;
         Ok(())
+    }
+
+    /// Wait for the next tick
+    pub fn wait_for_tick(&mut self) -> Result<Hash, ClientErrorSync<C>> {
+        let current = self.client.latest_blockhash()?;
+        Ok(self.client.tick_beyond(current)?)
     }
 
     /// Gets account information at the given address.

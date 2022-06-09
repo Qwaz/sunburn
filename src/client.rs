@@ -22,13 +22,10 @@ pub struct TransactionDetails {
     pub units_consumed: u64,
 }
 
-// #[from] is deliberately avoided to prevent ambiguity.
-// `TransactionSimulationDetails` is chosen as an intersection type of
-// possible execution results.
 #[derive(Debug, Error)]
 pub enum ClientError<E: std::error::Error> {
     #[error("channel error: {0}")]
-    ChannelError(#[source] E),
+    ChannelError(#[from] E),
     /// An error that represents an invalid transaction
     /// that is invalid and not executed.
     #[error("invalid transaction: {}", 0)]
@@ -55,6 +52,8 @@ pub trait ClientSync {
     ) -> Result<TransactionDetails, ClientError<Self::ChannelError>>;
 
     fn latest_blockhash(&mut self) -> Result<Hash, Self::ChannelError>;
+
+    fn tick_beyond(&mut self, blockhash: Hash) -> Result<Hash, Self::ChannelError>;
 
     fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>>;
 

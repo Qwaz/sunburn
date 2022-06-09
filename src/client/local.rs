@@ -125,6 +125,13 @@ impl ClientSync for LocalClientSync {
         Ok(self.bank.last_blockhash())
     }
 
+    fn tick_beyond(&mut self, blockhash: Hash) -> Result<Hash, Self::ChannelError> {
+        while self.bank.last_blockhash() == blockhash {
+            self.bank.register_tick(&Hash::new_unique())
+        }
+        Ok(self.bank.last_blockhash())
+    }
+
     fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>> {
         self.bank
             .get_account(&address)
