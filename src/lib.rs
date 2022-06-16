@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::atomic::Ordering};
 
-use client::{ClientError, ClientSync, LocalClientSync};
+use client::{local, ClientError, ClientSync, LocalClientSync};
+use log::{info, warn};
 use solana_program_test::programs::spl_programs;
 use solana_sdk::{
     account::{Account, AccountSharedData, ReadableAccount},
@@ -58,10 +59,43 @@ impl AccountConfig {
     }
 }
 
+#[derive(Default)]
+pub struct LogConfig {
+    /// Whether to log successful transaction result
+    pub log_successful_transaction: bool,
+    /// Whether to log failed transaction result
+    pub log_failed_transaction: bool,
+}
+
+impl LogConfig {
+    pub fn update_logger() {
+        if local::INTERNAL_LOGGING.load(Ordering::SeqCst) {
+            solana_logger::setup_with_default("sunburn=info,solana_runtime=debug");
+        } else {
+            solana_logger::setup_with_default("sunburn=info");
+        }
+    }
+
+    pub fn basic() -> Self {
+        LogConfig {
+            log_successful_transaction: false,
+            log_failed_transaction: true,
+        }
+    }
+
+    pub fn verbose() -> Self {
+        LogConfig {
+            log_successful_transaction: true,
+            log_failed_transaction: true,
+        }
+    }
+}
+
 pub struct EnvironmentGenesis {
     accounts: HashMap<Pubkey, AccountConfig>,
     address_labels: HashMap<Pubkey, String>,
     payer: Option<Keypair>,
+    log_config: Option<LogConfig>,
 }
 
 impl EnvironmentGenesis {
@@ -131,9 +165,14 @@ impl EnvironmentGenesis {
         self
     }
 
+    pub fn setup_logging(mut self, log_config: LogConfig) -> Self {
+        self.log_config = Some(log_config);
+        self
+    }
+
     /// Builds a [LocalClientSync] from the current configuration.
     pub fn build_local_sync(self) -> Environment<LocalClientSync> {
-        solana_logger::setup_with_default("");
+        LogConfig::update_logger();
         LocalClientSync::new(self)
     }
 }
@@ -144,6 +183,7 @@ impl Default for EnvironmentGenesis {
             accounts: Default::default(),
             address_labels: Default::default(),
             payer: None,
+            log_config: None,
         };
 
         for (addr, account) in spl_programs(&Rent::default()) {
@@ -195,6 +235,7 @@ pub struct Environment<C> {
     payer: Keypair,
     /// Cached [Rent] information
     rent: Rent,
+    log_config: LogConfig,
 }
 
 fn instructions_to_tx(
@@ -239,8 +280,21 @@ impl<C: ClientSync> Environment<C> {
     ) -> Result<(), ClientErrorSync<C>> {
         let blockhash = self.client.latest_blockhash()?;
         let transaction = instructions_to_tx(&self.payer, blockhash, instructions, signers);
-        self.client.send_transaction(transaction)?;
-        Ok(())
+
+        match self.client.send_transaction(transaction) {
+            Ok(details) => {
+                if self.log_config.log_successful_transaction {
+                    info!("Successful Transaction\n{:#?}", details);
+                }
+                Ok(())
+            }
+            Err(err) => {
+                if self.log_config.log_failed_transaction {
+                    warn!("Failed Transaction\n{:#?}", &err);
+                }
+                Err(err)
+            }
+        }
     }
 
     /// Runs a single instruction as a transaction and returns the result.

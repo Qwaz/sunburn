@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use solana_runtime::bank::{Bank, TransactionExecutionResult};
 use solana_sdk::{
     account::Account,
@@ -14,7 +16,19 @@ use solana_sdk::{
 };
 
 use super::{ClientError, ClientSync, TransactionDetails};
-use crate::{Environment, EnvironmentGenesis};
+use crate::{Environment, EnvironmentGenesis, LogConfig};
+
+pub(crate) static INTERNAL_LOGGING: AtomicBool = AtomicBool::new(false);
+
+pub fn enable_internal_logging() {
+    INTERNAL_LOGGING.store(true, Ordering::SeqCst);
+    LogConfig::update_logger();
+}
+
+pub fn disable_internal_logging() {
+    INTERNAL_LOGGING.store(false, Ordering::SeqCst);
+    LogConfig::update_logger();
+}
 
 pub struct LocalClientSync {
     bank: Bank,
@@ -68,6 +82,7 @@ impl LocalClientSync {
             _address_labels: genesis.address_labels,
             payer,
             rent,
+            log_config: genesis.log_config.unwrap_or_default(),
         }
     }
 }

@@ -1,6 +1,7 @@
-mod local;
+pub mod local;
 // TODO: mod remote;
 
+pub use local::LocalClientSync;
 use solana_sdk::{
     account::{from_account, Account},
     hash::Hash,
@@ -9,8 +10,6 @@ use solana_sdk::{
     transaction::{Transaction, TransactionError},
 };
 use thiserror::Error;
-
-pub use self::local::LocalClientSync;
 
 /// This is spiritually `solana_banks_interface::TransactionSimulationDetails`,
 /// but the original type was not used because `solana_banks_interface`
