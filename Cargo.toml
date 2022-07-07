@@ -1,24 +1,21 @@
 [package]
 name = "sunburn"
 description = "A PoC library for Solana smart contracts"
-version = "0.0.0-reserved"
+version = "0.1.0"
 edition = "2021"
 authors = ["Yechan Bae <qwazpia@gmail.com>"]
-license = "Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# solana-bpf-loader-program = "1.10.10"
-# solana-program-test = "1.10.10"
-# solana-runtime = "1.10.10"
-# solana-sdk = "1.10.10"
-# solana-logger = "1.10.10"
-solana-bpf-loader-program = "1.9.18"
-solana-program-test = "1.9.18"
-solana-runtime = "1.9.18"
-solana-sdk = "1.9.18"
-solana-logger = "1.9.18"
+# Support ~1.9.18 and ~1.10.10
+# 1.11 is not supported due to the breaking change in Solana
+solana-bpf-loader-program = "~1.10.10"
+solana-program-test = "~1.10.10"
+solana-runtime = "~1.10.10"
+solana-sdk = "~1.10.10"
+solana-logger = "~1.10.10"
 spl-token = "3.2.0"
 spl-associated-token-account = "1.0.3"
 
