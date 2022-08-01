@@ -39,8 +39,8 @@ pub enum ClientError<E: std::error::Error> {
     },
     #[error("account not found: {}", 0)]
     AccountNotFound(Pubkey),
-    #[error("account contains invalid data that cannot be deserialized")]
-    InvalidAccountData,
+    #[error("account {} contains invalid data that cannot be deserialized", 0)]
+    InvalidAccountData(Pubkey),
 }
 
 pub trait ClientSync {
@@ -58,7 +58,8 @@ pub trait ClientSync {
     fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>>;
 
     fn get_sysvar<T: Sysvar>(&mut self) -> Result<T, ClientError<Self::ChannelError>> {
-        self.get_account(T::id())
-            .map(|account| from_account::<T, _>(&account).expect("Failed to deserialize sysvar"))
+        self.get_account(T::id()).and_then(|account| {
+            from_account::<T, _>(&account).ok_or(ClientError::InvalidAccountData(T::id()))
+        })
     }
 }

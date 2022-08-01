@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use solana_client::{
     client_error::{ClientError as SolanaClientError, ClientErrorKind as SolanaClientErrorKind},
     rpc_client::RpcClient,
@@ -33,13 +35,10 @@ fn get_existing_account(
     client: &RpcClient,
     pubkey: &Pubkey,
 ) -> Result<Account, ClientError<SolanaClientError>> {
-    Ok(client
-        .get_account_with_commitment(&Rent::id(), CommitmentConfig::finalized())?
+    client
+        .get_account_with_commitment(&pubkey, CommitmentConfig::finalized())?
         .value
-        .expect(&format!(
-            "Account {} should exist in the remote environment",
-            pubkey
-        )))
+        .ok_or(ClientError::AccountNotFound(pubkey.clone()))
 }
 
 impl RemoteClientSync {
@@ -50,7 +49,7 @@ impl RemoteClientSync {
         let client = RpcClient::new(url);
         let mut rent_account_pair = (Rent::id(), get_existing_account(&client, &Rent::id())?);
         let rent = Rent::from_account_info(&rent_account_pair.into_account_info())
-            .expect("Rent account data corruption");
+            .map_err(|_| ClientError::InvalidAccountData(Rent::id()))?;
 
         for account_key in genesis.accounts().keys() {
             // asserts existence of accounts defined in `EnvironmentGenesis`
@@ -136,11 +135,18 @@ impl ClientSync for RemoteClientSync {
     }
 
     fn latest_blockhash(&mut self) -> Result<Hash, Self::ChannelError> {
-        todo!()
+        Ok(self.client.get_latest_blockhash()?)
     }
 
     fn tick_beyond(&mut self, blockhash: Hash) -> Result<Hash, Self::ChannelError> {
-        todo!()
+        let mut last_hash = self.client.get_latest_blockhash()?;
+        while last_hash == blockhash {
+            // FIXME: Justify the sleep amount
+            std::thread::sleep(Duration::from_millis(100));
+            last_hash = self.client.get_latest_blockhash()?;
+        }
+
+        Ok(last_hash)
     }
 
     fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>> {
