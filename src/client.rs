@@ -1,5 +1,5 @@
 pub mod local;
-// TODO: mod remote;
+pub mod remote;
 
 pub use local::LocalClientSync;
 use solana_sdk::{
@@ -11,14 +11,15 @@ use solana_sdk::{
 };
 use thiserror::Error;
 
-/// This is spiritually `solana_banks_interface::TransactionSimulationDetails`,
-/// but the original type was not used because `solana_banks_interface`
-/// does not have a good interoperability among different Solana versions
-/// and makes dependency resolution difficult.
+/// Generalized struct to represent the essence of
+/// `solana_banks_interface::TransactionSimulationDetails`
+/// and `solana_transaction_status::UiTransactionStatusMetaCopy`.
 #[derive(Clone, Debug)]
 pub struct TransactionDetails {
     pub log_messages: Vec<String>,
-    pub units_consumed: u64,
+    /// Consumed amount of computation unit.
+    /// Might be `None` for successfully executed remote transactions.
+    pub units_consumed: Option<u64>,
 }
 
 #[derive(Debug, Error)]
@@ -30,8 +31,8 @@ pub enum ClientError<E: std::error::Error> {
     #[error("invalid transaction: {}", 0)]
     InvalidTransaction(#[source] TransactionError),
     #[error("transaction failed to execute: {:?}", error)]
-    /// An error that represents a transaction
-    /// that was executed and failed.
+    /// An error that represents a transaction that was executed and failed.
+    /// This includes a simulation failure in preflight check.
     FailedTransaction {
         error: TransactionError,
         details: TransactionDetails,

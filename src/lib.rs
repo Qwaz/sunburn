@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::atomic::Ordering};
 
-use client::{local, ClientError, ClientSync, LocalClientSync};
+use client::{local, remote::RemoteClientSync, ClientError, ClientSync, LocalClientSync};
 use log::{info, warn};
 use solana_program_test::programs::spl_programs;
 use solana_sdk::{
@@ -109,8 +109,7 @@ impl EnvironmentGenesis {
     /// In local environment, a new account that holds huge amount of lamports will be added to the address.
     /// If omitted, a new keypair will be automatically generated when building the local environment.
     ///
-    /// In remote environment, the existence of this account will be checked
-    /// when the environment is built.
+    /// In remote environment, payer must be provided when the client is created.
     pub fn add_payer(mut self, keypair: Keypair) -> Self {
         let pubkey = keypair.pubkey();
         assert!(self.payer.is_none());
@@ -174,6 +173,22 @@ impl EnvironmentGenesis {
     pub fn build_local_sync(self) -> Environment<LocalClientSync> {
         LogConfig::update_logger();
         LocalClientSync::new(self)
+    }
+
+    /// Builds a [RemoteClientSync] from the current configuration.
+    pub fn build_remote_sync(
+        self,
+        url: impl ToString,
+    ) -> Result<
+        Environment<RemoteClientSync>,
+        ClientError<<RemoteClientSync as ClientSync>::ChannelError>,
+    > {
+        LogConfig::update_logger();
+        RemoteClientSync::new(self, url.to_string())
+    }
+
+    pub fn accounts(&self) -> &HashMap<Pubkey, AccountConfig> {
+        &self.accounts
     }
 }
 

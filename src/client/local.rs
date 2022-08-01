@@ -94,7 +94,7 @@ fn convert_tx_result<E: std::error::Error>(
         TransactionExecutionResult::Executed { details, .. } => {
             let details_core = TransactionDetails {
                 log_messages: details.log_messages.unwrap_or(Vec::new()),
-                units_consumed: details.executed_units,
+                units_consumed: Some(details.executed_units),
             };
             match details.status {
                 Ok(()) => Ok(details_core),
