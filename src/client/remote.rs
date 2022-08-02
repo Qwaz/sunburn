@@ -29,8 +29,6 @@ pub struct RemoteClientSync {
 }
 
 /// Wrapper around `RpcClient::get_account_with_commitment`.
-/// This methods panics when the provided account does not exist
-/// and returns `Err` when the communication fails.
 fn get_existing_account(
     client: &RpcClient,
     pubkey: &Pubkey,
@@ -150,6 +148,6 @@ impl ClientSync for RemoteClientSync {
     }
 
     fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>> {
-        todo!()
+        get_existing_account(&mut self.client, &address)
     }
 }

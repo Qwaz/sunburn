@@ -55,6 +55,8 @@ pub trait ClientSync {
 
     fn tick_beyond(&mut self, blockhash: Hash) -> Result<Hash, Self::ChannelError>;
 
+    /// Get account data from the chain.
+    /// Returns `Err(ClientError::AccountNotFound(pubkey))` if the target account does not exist.
     fn get_account(&mut self, address: Pubkey) -> Result<Account, ClientError<Self::ChannelError>>;
 
     fn get_sysvar<T: Sysvar>(&mut self) -> Result<T, ClientError<Self::ChannelError>> {

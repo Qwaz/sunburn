@@ -361,7 +361,7 @@ impl<C: ClientSync> Environment<C> {
     pub fn token_balance(&mut self, token_account: Pubkey) -> Result<u64, ClientErrorSync<C>> {
         let account = self.client.get_account(token_account)?;
         Ok(spl_token::state::Account::unpack_unchecked(&account.data())
-            .map_err(|_| ClientError::InvalidAccountData)?
+            .map_err(|_| ClientError::InvalidAccountData(token_account))?
             .amount)
     }
 
