@@ -1,6 +1,8 @@
 pub mod local;
 pub mod remote;
 
+use std::error::Error;
+
 pub use local::LocalClientSync;
 use solana_sdk::{
     account::{from_account, Account},
@@ -23,7 +25,7 @@ pub struct TransactionDetails {
 }
 
 #[derive(Debug, Error)]
-pub enum ClientError<E: std::error::Error> {
+pub enum ClientError<E: Error> {
     #[error("channel error: {0}")]
     ChannelError(#[from] E),
     /// An error that represents an invalid transaction
@@ -41,6 +43,48 @@ pub enum ClientError<E: std::error::Error> {
     AccountNotFound(Pubkey),
     #[error("account {} contains invalid data that cannot be deserialized", 0)]
     InvalidAccountData(Pubkey),
+}
+
+/// An opaque error type that can be used to handle errors from different
+/// clients at the same time. This struct can be useful for handling local
+/// and remote clients with the same code and switching between them, but as a
+/// trade-off, it becomes harder to match into internal value of `ChannelError`.
+#[derive(Debug, Error)]
+pub enum DynClientError {
+    #[error("channel error: {0}")]
+    ChannelError(Box<dyn Error + Send + Sync + 'static>),
+    /// An error that represents an invalid transaction
+    /// that is invalid and not executed.
+    #[error("invalid transaction: {}", 0)]
+    InvalidTransaction(#[source] TransactionError),
+    #[error("transaction failed to execute: {:?}", error)]
+    /// An error that represents a transaction that was executed and failed.
+    /// This includes a simulation failure in preflight check.
+    FailedTransaction {
+        error: TransactionError,
+        details: TransactionDetails,
+    },
+    #[error("account not found: {}", 0)]
+    AccountNotFound(Pubkey),
+    #[error("account {} contains invalid data that cannot be deserialized", 0)]
+    InvalidAccountData(Pubkey),
+}
+
+impl<E> From<ClientError<E>> for DynClientError
+where
+    E: Error + Send + Sync + 'static,
+{
+    fn from(err: ClientError<E>) -> Self {
+        match err {
+            ClientError::ChannelError(err) => DynClientError::ChannelError(Box::new(err)),
+            ClientError::InvalidTransaction(err) => DynClientError::InvalidTransaction(err),
+            ClientError::FailedTransaction { error, details } => {
+                DynClientError::FailedTransaction { error, details }
+            }
+            ClientError::AccountNotFound(pubkey) => DynClientError::AccountNotFound(pubkey),
+            ClientError::InvalidAccountData(pubkey) => DynClientError::InvalidAccountData(pubkey),
+        }
+    }
 }
 
 pub trait ClientSync {
